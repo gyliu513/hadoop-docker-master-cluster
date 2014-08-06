@@ -13,18 +13,22 @@ docker build -t="sequenceiq/hadoop-cluster-docker:2.4.1" .
 # Start a container
 
 ```
-docker run  -i -t --net=host  sequenceiq/hadoop-docker:v2.4.1 $1 $2 $3 $4 $5
-$1:master ip,such as 192.168.1.4
-$2:hdfs port,such as 9001
-$3:namenode(N) or datanode(D)
-$4:number of hdfs replication,such as 1 or 2
-$5:default command,such as -bash or -d
+# Start a container
+docker run   --net=host  sequenceiq/hadoop-cluster-docker:2.4.1 $1 $2 $3 $4 $5 $6
+Params definition as below:
+$1:Hdfs port, such as 9000
+$2:Hdfs DataNode port, such as 50010
+$3:Type of Namenode or Datanode, such as N | D
+$4:Number of hdfs replication, default is 1. Need more improvement for this param.
+$5:Default command, run as service "-d", run as interactive "-bash"
+$6:Master Node IP address, such as 10.28.241.174
+
 
 #start name node
-eg: docker run  -i -t --privileged  --net=host sequenceiq/hadoop-cluster-docker:2.4.1 192.168.1.4 9001 N 1 -bash
+eg: docker run  -i -t --net=host sequenceiq/hadoop-cluster-docker:2.4.1 9001 50010 N 1 -bash 10.28.241.172 
 
 #start data node
-eg: docker run  -i -t --privileged  --net=host sequenceiq/hadoop-cluster-docker:2.4.1 192.168.1.4 9001 D 1 -bash
+eg: docker run  -i -t --net=host sequenceiq/hadoop-cluster-docker:2.4.1 9001 50010 D 1 -bash 10.28.241.172 
 
 ```
 
