@@ -1,0 +1,125 @@
+asc_template_version: 2014-08-22
+
+description: >
+    Template of Hadoop Cluster
+      1. One Hadooop Master Node
+      2. Multiple Hadoop Worker Nodes
+
+parameter_groups:
+    - label: Resource Groups
+      description: >
+        Parameters that
+        specify resource groups
+      parameters:
+        - master_rg
+        - worker_rg
+
+parameters:
+    master_consumer:
+        type: string
+        label: Hadoop Master Consumer
+        description: Top level consumer for this application
+
+    master_rg:
+        type: string
+        label: Resource Group for Hadoop Master
+        description: Resource Group for Hadoop Master Service
+        constraints:
+            - custom_constraint: asc.getresourcegroup
+
+    worker_consumer:
+        type: string
+        label: Hadoop Worker Consumer
+        description: Top level consumer for this application
+            
+    worker_rg:
+        type: string
+        label: Resource Group for Hadoop Worker
+        description: Resource Group for Hadoop Worker Service
+        constraints:
+            - custom_constraint: asc.getresourcegroup
+
+resources:
+    hadoop-service-group: # How does this works with the GUI flow? 
+        type: IBM::ASC::ServiceGroup
+        properties:
+            description: Service group for Hadoop
+            services: 
+                - { get_resource: master-service }
+                - { get_resource: worker-service }
+
+    master_activity:
+        type: IBM::ASC::Activity
+        properties:
+            os: [X86_64] # Let's start with this  
+            executionuser: root #required
+            commands:
+                start:
+                    command: /root/ego_docker/egodocker.py run -i -t sequenceiq/hadoop-cluster-docker:2.4.1 9001 50010 N 1 -bash 10.28.241.172
+                stop: 
+                    command: /root/ego_docker/egodocker.py stop
+                    waitperiod_sec: 5
+                monitor: #optional
+                     command: /root/ego_docker/SparkMasterMonitor.sh 9001
+                     maxupdateinterval_sec: 60
+                    
+    worker_activity:
+        type: IBM::ASC::Activity
+        properties:
+            os: [X86_64] # Let's start with this 
+            executionuser: root #required
+            commands:
+                start:
+                    command: /root/ego_docker/egodocker.py run -i -t sequenceiq/hadoop-cluster-docker:2.4.1 9001 50010 D 1 -bash 10.28.241.172
+                stop: 
+                    command: /root/ego_docker/egodocker.py stop
+                    waitperiod_sec: 5
+
+    master-service:
+        type: IBM::ASC::Service
+        properties:
+            description: Hadoop Master service
+            numinstances:
+                min: 1
+                max: 1
+                maxperhost: 1
+                instancetoslotratio: 1:1 
+            priority: 10 
+            needcredential: false
+            consumer: { get_param: master_consumer }
+            resourcegroup:  { get_param: master_rg }
+            resourcerequirement: select(hname=='shuynh-gecko2.oncloud.local')
+            activity: 
+                - { get_resource: master_activity }
+            controlpolicy:
+                maxrestarts: 10
+                hostfailoverinterval_sec: 1
+                hearbeatinterval_sec: 60
+                blockedhostexitvalues: [-1, 1]
+           
+    worker-service:
+        type: IBM::ASC::Service::Stateful
+        properties:
+            description: Hadoop Worker Service
+            numinstances:
+                min: 1 
+                max: 2  # just picked a number here
+                maxperhost: 1
+            consumer: { get_param: worker_consumer }
+            resourcegroup:  { get_param: worker_rg } 
+            resourcerequirement: select(hname!='shuynh-gecko2.oncloud.local')
+            activity:
+                - { get_resource: worker_activity}
+            controlpolicy:
+                maxrestarts: 10
+            dependency:
+                - target: { get_resource: master-service }
+                  satisfy: 
+                    - STARTED
+                  autostart: true
+
+outputs:
+    namenode_rg:
+        description: RG of Hadoop Server Portal
+        value:  { get_param: master_rg }
+
